@@ -2,6 +2,7 @@ package gniffer
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/google/gopacket"
@@ -20,7 +21,7 @@ func GetNetCards() []NetCard {
 	}
 
 	for _, device := range devices {
-		//debugPrint(device.Description)
+		debugPrint("Name: " + device.Name + " Description: " + device.Description)
 		var NetCard = NetCard{
 			Description: device.Description,
 			Name:        device.Name,
@@ -35,8 +36,27 @@ func GetNetCards() []NetCard {
 }
 
 func (n *NetCard) Init() {
+	debugPrint("Init card" + n.device.Description)
 	n.stopCtx = context.Background()
 	n.originDataChan = make(chan gopacket.Packet, 100)
 	n.reset = make(chan struct{})
 	n.bufferMu = sync.Mutex{}
+}
+
+func Start(cardName string) error {
+	card, isExist := cards[cardName]
+	if !isExist {
+		return errors.New("card not found")
+	}
+
+	card.Init()
+	go card.listen()
+	go card.getData()
+
+	return nil
+}
+
+func Stop(cardName string) {
+	card := cards[cardName]
+	card.stopCtx.Done()
 }

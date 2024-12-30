@@ -12,7 +12,7 @@ func InitRouter() {
 	card := r.Group("/card")
 	{
 		card.GET("/list", getNetCardsList)
-		card.GET("/listen")
+		card.GET("/listen", listen)
 	}
 
 	r.Run()

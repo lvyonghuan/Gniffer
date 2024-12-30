@@ -8,6 +8,8 @@ import (
 	"github.com/google/gopacket/layers"
 )
 
+var OutPutChan = make(chan TreeRoot, 100)
+
 func (n *NetCard) getData() {
 	for {
 		select {
@@ -35,6 +37,7 @@ func (n *NetCard) analyzePacket(packet gopacket.Packet) {
 		n.bufferMu.Lock()
 		defer n.bufferMu.Unlock()
 		n.buffer = append(n.buffer, treeRoot)
+		OutPutChan <- treeRoot
 		//debugPrint(treeRoot)
 	}()
 
@@ -64,12 +67,14 @@ func (n *NetCard) analyzePacket(packet gopacket.Packet) {
 		if leafARP.Info != "" {
 			treeRoot.Children = append(treeRoot.Children, leafARP)
 		}
+		treeRoot.Protocol = "ARP"
 		return
 	case "LLC":
 		leafLLC := getLLCLayer(packet)
 		if leafLLC.Info != "" {
 			treeRoot.Children = append(treeRoot.Children, leafLLC)
 		}
+		treeRoot.Protocol = "LLC"
 		return
 	default:
 		debugPrint("Unknown type: " + typ)
@@ -83,21 +88,25 @@ func (n *NetCard) analyzePacket(packet gopacket.Packet) {
 		if leafTCP.Info != "" {
 			treeRoot.Children = append(treeRoot.Children, leafTCP)
 		}
+		treeRoot.Protocol = "TCP"
 	case "UDP":
 		leafUDP := getUDP(packet)
 		if leafUDP.Info != "" {
 			treeRoot.Children = append(treeRoot.Children, leafUDP)
 		}
+		treeRoot.Protocol = "UDP"
 	case "ICMPv4":
 		leafICMPv4 := getICMPv4Layer(packet)
 		if leafICMPv4.Info != "" {
 			treeRoot.Children = append(treeRoot.Children, leafICMPv4)
 		}
+		treeRoot.Protocol = "ICMPv4"
 	case "ICMPv6":
 		leafICMPv6 := getICMPv6Layer(packet)
 		if leafICMPv6.Info != "" {
 			treeRoot.Children = append(treeRoot.Children, leafICMPv6)
 		}
+		treeRoot.Protocol = "ICMPv6"
 	default:
 		debugPrint("Unknown protocol: " + protocol)
 	}

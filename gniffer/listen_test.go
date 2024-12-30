@@ -9,14 +9,14 @@ import (
 
 func TestListen(t *testing.T) {
 	t.Log("Test case")
-	cards := getNetCards()
+	cards := GetNetCards()
 	if len(cards) == 0 {
 		t.Error("No network cards found")
 	}
 
 	card := cards[5]
 
-	card.init()
+	card.Init()
 	go card.listen()
 
 	var buffer []gopacket.Packet

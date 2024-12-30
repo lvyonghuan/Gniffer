@@ -32,6 +32,8 @@ type TreeRoot struct {
 	ID         int    `json:"id"`
 	Children   []Leaf `json:"children"`
 	OriginData string `json:"originData"`
+
+	Protocol string `json:"protocol"`
 }
 
 type Leaf struct {
