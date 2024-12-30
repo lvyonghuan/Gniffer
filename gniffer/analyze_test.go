@@ -1,6 +1,7 @@
-package main
+package gniffer
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
@@ -19,9 +20,14 @@ func TestAnalyze(t *testing.T) {
 	go card.getData()
 
 	for {
-		if len(card.buffer) >= 100 {
+		if len(card.buffer) >= 1000 {
 			card.stopCtx.Done()
 			time.Sleep(1 * time.Second)
+
+			for _, tree := range card.buffer {
+				fmt.Println(tree)
+			}
+
 			t.Log("Test case end")
 			return
 		}

@@ -1,9 +1,9 @@
-package main
+package gniffer
 
 import "testing"
 
 func TestGetNetCards(t *testing.T) {
-	cards := getNetCards()
+	cards := GetNetCards()
 	if len(cards) == 0 {
 		t.Error("No network cards found")
 	}

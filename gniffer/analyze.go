@@ -1,4 +1,4 @@
-package main
+package gniffer
 
 import (
 	"fmt"
@@ -28,12 +28,13 @@ func (n *NetCard) getData() {
 
 func (n *NetCard) analyzePacket(packet gopacket.Packet) {
 	var treeRoot TreeRoot
+	id := atomic.AddInt32(&n.nextID, 1)
+	treeRoot.ID = int(id)
 
 	defer func() {
-		id := atomic.AddInt32(&n.nextID, 1)
 		n.bufferMu.Lock()
 		defer n.bufferMu.Unlock()
-		n.buffer = append(n.buffer, data{id: int(id), d: packet})
+		n.buffer = append(n.buffer, treeRoot)
 		//debugPrint(treeRoot)
 	}()
 
@@ -58,12 +59,24 @@ func (n *NetCard) analyzePacket(packet gopacket.Packet) {
 			treeRoot.Children = append(treeRoot.Children, leafIPv6)
 		}
 		protocol = p
+	case "ARP":
+		leafARP := getARP(packet)
+		if leafARP.Info != "" {
+			treeRoot.Children = append(treeRoot.Children, leafARP)
+		}
+		return
+	case "LLC":
+		leafLLC := getLLCLayer(packet)
+		if leafLLC.Info != "" {
+			treeRoot.Children = append(treeRoot.Children, leafLLC)
+		}
+		return
 	default:
 		debugPrint("Unknown type: " + typ)
 		return
 	}
 
-	// TCP layer
+	// Transport/Network layer
 	switch protocol {
 	case "TCP":
 		leafTCP := getTCP(packet)
@@ -88,8 +101,6 @@ func (n *NetCard) analyzePacket(packet gopacket.Packet) {
 	default:
 		debugPrint("Unknown protocol: " + protocol)
 	}
-
-	//TODO
 }
 
 func getEthernetLayer(packet gopacket.Packet) (Leaf, string) {
@@ -126,6 +137,30 @@ func getIPv6Layer(packet gopacket.Packet) (Leaf, string) {
 		return leaf, ipv6.NextHeader.String()
 	}
 	return Leaf{}, ""
+}
+
+func getARP(packet gopacket.Packet) Leaf {
+	arpLayer := packet.Layer(layers.LayerTypeARP)
+	if arpLayer != nil {
+		arp := arpLayer.(*layers.ARP)
+		var leaf Leaf
+		leaf.Info = fmt.Sprintf("Operation:%d\nSourceHwAddress:%s\nSourceProtAddress:%s\nDstHwAddress:%s\nDstProtAddress:%s", arp.Operation, arp.SourceHwAddress, arp.SourceProtAddress, arp.DstHwAddress, arp.DstProtAddress)
+		leaf.Hex = fmt.Sprintf("%x", arp.LayerContents())
+		return leaf
+	}
+	return Leaf{}
+}
+
+func getLLCLayer(packet gopacket.Packet) Leaf {
+	llcLayer := packet.Layer(layers.LayerTypeLLC)
+	if llcLayer != nil {
+		llc := llcLayer.(*layers.LLC)
+		var leaf Leaf
+		leaf.Info = fmt.Sprintf("DSAP:%d\nSSAP:%d\nControl:%d\nIG:%t\nCR:%t\n\nPayload:%v", llc.DSAP, llc.SSAP, llc.Control, llc.IG, llc.CR, llc.Payload)
+		leaf.Hex = fmt.Sprintf("%x", llc.LayerContents())
+		return leaf
+	}
+	return Leaf{}
 }
 
 func getICMPv4Layer(packet gopacket.Packet) Leaf {

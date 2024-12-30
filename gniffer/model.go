@@ -1,4 +1,4 @@
-package main
+package gniffer
 
 import (
 	"context"
@@ -9,7 +9,8 @@ import (
 )
 
 type NetCard struct {
-	Name string
+	Description string `json:"description"`
+	Name        string `json:"name"`
 
 	device pcap.Interface
 
@@ -17,7 +18,7 @@ type NetCard struct {
 	originDataChan chan gopacket.Packet
 	reset          chan struct{}
 
-	buffer   []data
+	buffer   []TreeRoot
 	bufferMu sync.Mutex
 	nextID   int32
 }

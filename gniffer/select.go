@@ -1,4 +1,4 @@
-package main
+package gniffer
 
 import (
 	"context"
@@ -8,8 +8,10 @@ import (
 	"github.com/google/gopacket/pcap"
 )
 
-// Get all network cards
-func getNetCards() []NetCard {
+var cards = make(map[string]NetCard)
+
+// GetNetCards Get all network cards
+func GetNetCards() []NetCard {
 	var netCards []NetCard
 
 	devices, err := pcap.FindAllDevs()
@@ -18,14 +20,21 @@ func getNetCards() []NetCard {
 	}
 
 	for _, device := range devices {
-		debugPrint(device.Description)
-		netCards = append(netCards, NetCard{Name: device.Name, device: device})
+		//debugPrint(device.Description)
+		var NetCard = NetCard{
+			Description: device.Description,
+			Name:        device.Name,
+			device:      device,
+		}
+
+		netCards = append(netCards, NetCard)
+		cards[device.Name] = NetCard
 	}
 
 	return netCards
 }
 
-func (n *NetCard) init() {
+func (n *NetCard) Init() {
 	n.stopCtx = context.Background()
 	n.originDataChan = make(chan gopacket.Packet, 100)
 	n.reset = make(chan struct{})
