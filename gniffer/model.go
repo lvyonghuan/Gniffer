@@ -33,7 +33,12 @@ type TreeRoot struct {
 	Children   []Leaf `json:"children"`
 	OriginData string `json:"originData"`
 
-	Protocol string `json:"protocol"`
+	Time        string `json:"time"`
+	Source      string `json:"source"`
+	Destination string `json:"destination"`
+	Protocol    string `json:"protocol"`
+	Length      int    `json:"length"`
+	Info        string `json:"info"`
 }
 
 type Leaf struct {

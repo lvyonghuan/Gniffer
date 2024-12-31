@@ -35,6 +35,14 @@ func GetNetCards() []NetCard {
 	return netCards
 }
 
+func GetCards() []NetCard {
+	var netCards []NetCard
+	for _, card := range cards {
+		netCards = append(netCards, card)
+	}
+	return netCards
+}
+
 func (n *NetCard) Init() {
 	debugPrint("Init card" + n.device.Description)
 	n.stopCtx = context.Background()

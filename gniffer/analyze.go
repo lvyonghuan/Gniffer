@@ -32,6 +32,7 @@ func (n *NetCard) analyzePacket(packet gopacket.Packet) {
 	var treeRoot TreeRoot
 	id := atomic.AddInt32(&n.nextID, 1)
 	treeRoot.ID = int(id)
+	treeRoot.Time = packet.Metadata().Timestamp.String()
 
 	defer func() {
 		n.bufferMu.Lock()
@@ -42,24 +43,30 @@ func (n *NetCard) analyzePacket(packet gopacket.Packet) {
 	}()
 
 	// Ethernet layer
-	leafEthernet, typ := getEthernetLayer(packet)
+	leafEthernet, typ, src, dst := getEthernetLayer(packet)
 	if leafEthernet.Info != "" {
 		treeRoot.Children = append(treeRoot.Children, leafEthernet)
+		treeRoot.Source = src
+		treeRoot.Destination = dst
 	}
 
 	// IP layer
 	var protocol string
 	switch typ {
 	case "IPv4":
-		leafIPv4, p := getIPv4Layer(packet)
+		leafIPv4, p, src, dst := getIPv4Layer(packet)
 		if leafIPv4.Info != "" {
 			treeRoot.Children = append(treeRoot.Children, leafIPv4)
+			treeRoot.Source = src
+			treeRoot.Destination = dst
 		}
 		protocol = p
 	case "IPv6":
-		leafIPv6, p := getIPv6Layer(packet)
+		leafIPv6, p, src, dst := getIPv6Layer(packet)
 		if leafIPv6.Info != "" {
 			treeRoot.Children = append(treeRoot.Children, leafIPv6)
+			treeRoot.Source = src
+			treeRoot.Destination = dst
 		}
 		protocol = p
 	case "ARP":
@@ -112,40 +119,40 @@ func (n *NetCard) analyzePacket(packet gopacket.Packet) {
 	}
 }
 
-func getEthernetLayer(packet gopacket.Packet) (Leaf, string) {
+func getEthernetLayer(packet gopacket.Packet) (Leaf, string, string, string) {
 	etherNetLayer := packet.Layer(layers.LayerTypeEthernet)
 	if etherNetLayer != nil {
 		etherNet := etherNetLayer.(*layers.Ethernet)
 		var leaf Leaf
 		leaf.Info = "Source MAC: " + etherNet.SrcMAC.String() + "\n" + "Destination MAC: " + etherNet.DstMAC.String() + "\n" + "Ethernet type: " + etherNet.EthernetType.String()
 		leaf.Hex = fmt.Sprintf("%x", etherNet.LayerContents())
-		return leaf, etherNet.EthernetType.String()
+		return leaf, etherNet.EthernetType.String(), etherNet.SrcMAC.String(), etherNet.DstMAC.String()
 	}
-	return Leaf{}, ""
+	return Leaf{}, "", "", ""
 }
 
-func getIPv4Layer(packet gopacket.Packet) (Leaf, string) {
+func getIPv4Layer(packet gopacket.Packet) (Leaf, string, string, string) {
 	ipv4Layer := packet.Layer(layers.LayerTypeIPv4)
 	if ipv4Layer != nil {
 		ipv4 := ipv4Layer.(*layers.IPv4)
 		var leaf Leaf
 		leaf.Info = fmt.Sprintf("Version:%d\nIHL:%d\nTOS:%d\nLength:%d\nId:%d\nFlags:%d\nFragOffset:%d\nTTL:%d\nProtocol:%d\nChecksum:%d\nSource:%s\nDestination:%s", ipv4.Version, ipv4.IHL, ipv4.TOS, ipv4.Length, ipv4.Id, ipv4.Flags, ipv4.FragOffset, ipv4.TTL, ipv4.Protocol, ipv4.Checksum, ipv4.SrcIP.String(), ipv4.DstIP.String())
 		leaf.Hex = fmt.Sprintf("%x", ipv4.LayerContents())
-		return leaf, ipv4.Protocol.String()
+		return leaf, ipv4.Protocol.String(), ipv4.SrcIP.String(), ipv4.DstIP.String()
 	}
-	return Leaf{}, ""
+	return Leaf{}, "", "", ""
 }
 
-func getIPv6Layer(packet gopacket.Packet) (Leaf, string) {
+func getIPv6Layer(packet gopacket.Packet) (Leaf, string, string, string) {
 	ipv6Layer := packet.Layer(layers.LayerTypeIPv6)
 	if ipv6Layer != nil {
 		ipv6 := ipv6Layer.(*layers.IPv6)
 		var leaf Leaf
 		leaf.Info = fmt.Sprintf("Version:%d\nLength:%d\nFlow Label:%d\nNext Header:%d\nHop Limit:%d\nSource Address:%s\nDestination Address:%s", ipv6.Version, ipv6.Length, ipv6.FlowLabel, ipv6.NextHeader, ipv6.HopLimit, ipv6.SrcIP.String(), ipv6.DstIP.String())
 		leaf.Hex = fmt.Sprintf("%x", ipv6.LayerContents())
-		return leaf, ipv6.NextHeader.String()
+		return leaf, ipv6.NextHeader.String(), ipv6.SrcIP.String(), ipv6.DstIP.String()
 	}
-	return Leaf{}, ""
+	return Leaf{}, "", "", ""
 }
 
 func getARP(packet gopacket.Packet) Leaf {
