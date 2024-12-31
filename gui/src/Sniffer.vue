@@ -1,10 +1,13 @@
 <template>
     <el-table
-        :data="displayedData"
-        style="width: 100%"
-        v-loading="loading"
-        element-loading-text="加载中..."
-        element-loading-spinner="el-icon-loading"
+        ref="table"
+        :data="tableData"
+        style="width: 100%; height: 400px"
+        virtual-scrolling
+        :height="400"
+        :item-size="40"
+        @scroll="handleScroll"
+        @row-click="handleRowClick"
     >
         <el-table-column prop="id" label="序号" width="80" />
         <el-table-column prop="time" label="时间" width="180" />
@@ -16,7 +19,16 @@
 
     <!-- 具体信息展示区域 -->
     <el-container>
-        <!-- 可以根据需要扩展 -->
+        <div v-if="selectedRow" style="width: 100%; height: 200px; overflow: auto;">
+            <el-collapse>
+                <el-collapse-item v-for="(item, index) in selectedRow.children" :key="index" :title="item.name">
+                    <div style="display: flex; justify-content: space-between;">
+                        <pre>{{ item.info }}</pre>
+                        <pre style="margin-right: 60px;">{{ item.hex.match(/.{1,2}/g).join(' ') }}</pre>
+                    </div>
+                </el-collapse-item>
+            </el-collapse>
+        </div>
     </el-container>
 </template>
 
@@ -24,112 +36,93 @@
 export default {
     data() {
         return {
-            tableData: [], // 全部捕获数据
-            buffer: [], // 数据缓冲区
-            loading: false, // 加载状态
-            updateInterval: null, // 定时器引用
-            maxRows: 10000, // 最大显示行数
-        };
+            tableData: [],
+            maxIndex: 0,
+            currentStartIndex: 0,
+            currentEndIndex: 25,
+            selectedRow: null,
+        }
     },
-    name: "Sniffer",
+    name: 'Sniffer',
     props: {
         selectedOption: {
             type: String,
-            required: true,
+            required: true
         },
         searchText: {
             type: String,
-            required: true,
+            required: true
         },
         isCapturing: {
             type: Boolean,
-            required: true,
-        },
-    },
-    computed: {
-        displayedData() {
-            // 根据搜索文本动态过滤数据
-            return this.searchText
-                ? this.tableData.filter((item) =>
-                      Object.values(item)
-                          .join(" ")
-                          .toLowerCase()
-                          .includes(this.searchText.toLowerCase())
-                  )
-                : this.tableData;
-        },
+            required: true
+        }
     },
     watch: {
         selectedOption(newVal, oldVal) {
-            console.log("selectedOption changed:", oldVal, "->", newVal);
+
         },
         searchText(newVal, oldVal) {
-            console.log("searchText changed:", oldVal, "->", newVal);
+            console.log('searchText changed:', oldVal, '->', newVal);
         },
-        isCapturing(newVal, oldVal) {
+        async isCapturing(newVal, oldVal) {
             if (newVal) {
+                await fetch(`http://127.0.0.1:8080/listen?netCard=${this.selectedOption}`);
+
+                this.tableData = [];
+                this.maxIndex = 0;
+                this.currentStartIndex = 0;
+                this.currentEndIndex = 25;
                 this.startCapture();
             } else {
                 this.stopCapture();
             }
-        },
+        }
     },
+
     methods: {
         startCapture() {
-            if (this.ws) {
-                this.ws.close();
-            }
-
-            this.loading = true;
-            const ws = new WebSocket(
-                `ws://127.0.0.1:8080/listen?netCard=${this.selectedOption}`
-            );
-
-            ws.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                this.buffer.push(data);
-            };
-
-            ws.onerror = (err) => {
-                console.error("WebSocket error:", err);
-                this.loading = false;
-            };
-
-            ws.onclose = () => {
-                this.loading = false;
-            };
-
-            this.ws = ws;
-
-            // 设置定时器批量刷新表格数据
-            this.updateInterval = setInterval(() => {
-                if (this.buffer.length > 0) {
-                    const newData = this.buffer.splice(0, this.buffer.length);
-                    // 合并数据并限制长度
-                    this.tableData = [
-                        ...newData,
-                        ...this.tableData,
-                    ]
-                        .slice(0, this.maxRows)
-                        .sort((a, b) => a.id - b.id); // 按序号排序
+            this.pollTimer = setInterval(async () => {
+                const start = Math.max(0, this.maxIndex - 25);
+                const end = Math.max(25, this.maxIndex);
+                const response = await fetch(`http://127.0.0.1:8080/require?start=${start}&end=-1`);
+                const { data, index } = await response.json();
+                this.tableData = data.reverse();
+                this.maxIndex = index;
+                this.currentStartIndex = start;
+                this.currentEndIndex = end;
+            }, 1000);
+        },
+        async handleScroll({ scrollTop }) {
+            if (scrollTop === 0 && this.isCapturing) {
+                if (!this.pollTimer) {
+                    this.startCapture();
                 }
-            }, 100);
-        },
-        stopCapture() {
-            console.log("stopCapture");
-
-            if (this.ws) {
-                this.ws.close();
-                this.ws = null;
+            } else {
+                if (this.pollTimer) {
+                    clearInterval(this.pollTimer);
+                    this.pollTimer = null;
+                }
+                if (scrollTop + this.$refs.table.$el.clientHeight >= this.$refs.table.$el.scrollHeight) {
+                    const lastItem = this.tableData[this.tableData.length - 1];
+                    const end = lastItem.id - 1;
+                    const start = lastItem.id - 50;
+                    const response = await fetch(`http://127.0.0.1:8080/require?start=${start}&end=${end}`);
+                    const { data } = await response.json();
+                    this.tableData = this.tableData.concat(data.reverse());
+                }
             }
-
-            if (this.updateInterval) {
-                clearInterval(this.updateInterval);
-                this.updateInterval = null;
-            }
-
-            this.loading = false;
         },
+        async stopCapture() {
+            if (this.pollTimer) {
+                clearInterval(this.pollTimer);
+                this.pollTimer = null;
+            }
+            await fetch(`http://127.0.0.1:8080/stop?netCard=${this.selectedOption}`);
+        },
+        handleRowClick(row) {
+            this.selectedRow = row;
+        }
     },
-};
+}
 </script>

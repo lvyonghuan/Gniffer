@@ -20,6 +20,9 @@ func (n *NetCard) listen() {
 
 	debugPrint("Start listening on " + n.device.Description)
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
+	beforeHandelBuffer = &(n.buffer)
+
+	go n.handelData()
 
 	for {
 		select {

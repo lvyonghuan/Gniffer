@@ -3,6 +3,7 @@ package gniffer
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/pcap"
@@ -15,6 +16,7 @@ type NetCard struct {
 	device pcap.Interface
 
 	stopCtx        context.Context
+	stopCancelFunc context.CancelFunc
 	originDataChan chan gopacket.Packet
 	reset          chan struct{}
 
@@ -23,17 +25,13 @@ type NetCard struct {
 	nextID   int32
 }
 
-type data struct {
-	id int
-	d  gopacket.Packet
-}
-
 type TreeRoot struct {
 	ID         int    `json:"id"`
 	Children   []Leaf `json:"children"`
 	OriginData string `json:"originData"`
 
 	Time        string `json:"time"`
+	time        time.Time
 	Source      string `json:"source"`
 	Destination string `json:"destination"`
 	Protocol    string `json:"protocol"`
@@ -42,7 +40,7 @@ type TreeRoot struct {
 }
 
 type Leaf struct {
-	Info     any    `json:"info"`
-	Hex      string `json:"hex"` //对应的16进制数据
-	Children []Leaf `json:"children"`
+	Name string `json:"name"`
+	Info any    `json:"info"`
+	Hex  string `json:"hex"` //对应的16进制数据
 }

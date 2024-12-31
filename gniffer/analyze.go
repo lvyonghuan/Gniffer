@@ -8,8 +8,6 @@ import (
 	"github.com/google/gopacket/layers"
 )
 
-var OutPutChan = make(chan TreeRoot, 100)
-
 func (n *NetCard) getData() {
 	for {
 		select {
@@ -30,15 +28,16 @@ func (n *NetCard) getData() {
 
 func (n *NetCard) analyzePacket(packet gopacket.Packet) {
 	var treeRoot TreeRoot
+
 	id := atomic.AddInt32(&n.nextID, 1)
 	treeRoot.ID = int(id)
 	treeRoot.Time = packet.Metadata().Timestamp.String()
+	treeRoot.Length = packet.Metadata().Length
 
 	defer func() {
 		n.bufferMu.Lock()
 		defer n.bufferMu.Unlock()
 		n.buffer = append(n.buffer, treeRoot)
-		OutPutChan <- treeRoot
 		//debugPrint(treeRoot)
 	}()
 
@@ -124,6 +123,7 @@ func getEthernetLayer(packet gopacket.Packet) (Leaf, string, string, string) {
 	if etherNetLayer != nil {
 		etherNet := etherNetLayer.(*layers.Ethernet)
 		var leaf Leaf
+		leaf.Name = "Ethernet"
 		leaf.Info = "Source MAC: " + etherNet.SrcMAC.String() + "\n" + "Destination MAC: " + etherNet.DstMAC.String() + "\n" + "Ethernet type: " + etherNet.EthernetType.String()
 		leaf.Hex = fmt.Sprintf("%x", etherNet.LayerContents())
 		return leaf, etherNet.EthernetType.String(), etherNet.SrcMAC.String(), etherNet.DstMAC.String()
@@ -136,6 +136,7 @@ func getIPv4Layer(packet gopacket.Packet) (Leaf, string, string, string) {
 	if ipv4Layer != nil {
 		ipv4 := ipv4Layer.(*layers.IPv4)
 		var leaf Leaf
+		leaf.Name = "IPv4"
 		leaf.Info = fmt.Sprintf("Version:%d\nIHL:%d\nTOS:%d\nLength:%d\nId:%d\nFlags:%d\nFragOffset:%d\nTTL:%d\nProtocol:%d\nChecksum:%d\nSource:%s\nDestination:%s", ipv4.Version, ipv4.IHL, ipv4.TOS, ipv4.Length, ipv4.Id, ipv4.Flags, ipv4.FragOffset, ipv4.TTL, ipv4.Protocol, ipv4.Checksum, ipv4.SrcIP.String(), ipv4.DstIP.String())
 		leaf.Hex = fmt.Sprintf("%x", ipv4.LayerContents())
 		return leaf, ipv4.Protocol.String(), ipv4.SrcIP.String(), ipv4.DstIP.String()
@@ -148,6 +149,7 @@ func getIPv6Layer(packet gopacket.Packet) (Leaf, string, string, string) {
 	if ipv6Layer != nil {
 		ipv6 := ipv6Layer.(*layers.IPv6)
 		var leaf Leaf
+		leaf.Name = "IPv6"
 		leaf.Info = fmt.Sprintf("Version:%d\nLength:%d\nFlow Label:%d\nNext Header:%d\nHop Limit:%d\nSource Address:%s\nDestination Address:%s", ipv6.Version, ipv6.Length, ipv6.FlowLabel, ipv6.NextHeader, ipv6.HopLimit, ipv6.SrcIP.String(), ipv6.DstIP.String())
 		leaf.Hex = fmt.Sprintf("%x", ipv6.LayerContents())
 		return leaf, ipv6.NextHeader.String(), ipv6.SrcIP.String(), ipv6.DstIP.String()
@@ -160,6 +162,7 @@ func getARP(packet gopacket.Packet) Leaf {
 	if arpLayer != nil {
 		arp := arpLayer.(*layers.ARP)
 		var leaf Leaf
+		leaf.Name = "ARP"
 		leaf.Info = fmt.Sprintf("Operation:%d\nSourceHwAddress:%s\nSourceProtAddress:%s\nDstHwAddress:%s\nDstProtAddress:%s", arp.Operation, arp.SourceHwAddress, arp.SourceProtAddress, arp.DstHwAddress, arp.DstProtAddress)
 		leaf.Hex = fmt.Sprintf("%x", arp.LayerContents())
 		return leaf
@@ -172,6 +175,7 @@ func getLLCLayer(packet gopacket.Packet) Leaf {
 	if llcLayer != nil {
 		llc := llcLayer.(*layers.LLC)
 		var leaf Leaf
+		leaf.Name = "LLC"
 		leaf.Info = fmt.Sprintf("DSAP:%d\nSSAP:%d\nControl:%d\nIG:%t\nCR:%t\n\nPayload:%v", llc.DSAP, llc.SSAP, llc.Control, llc.IG, llc.CR, llc.Payload)
 		leaf.Hex = fmt.Sprintf("%x", llc.LayerContents())
 		return leaf
@@ -184,6 +188,7 @@ func getICMPv4Layer(packet gopacket.Packet) Leaf {
 	if icmpv4Layer != nil {
 		icmpv4 := icmpv4Layer.(*layers.ICMPv4)
 		var leaf Leaf
+		leaf.Name = "ICMPv4"
 		leaf.Info = "Type: " + icmpv4.TypeCode.String()
 		leaf.Hex = fmt.Sprintf("%x", icmpv4.LayerContents())
 		return leaf
@@ -196,6 +201,7 @@ func getICMPv6Layer(packet gopacket.Packet) Leaf {
 	if icmpv6Layer != nil {
 		icmpv6 := icmpv6Layer.(*layers.ICMPv6)
 		var leaf Leaf
+		leaf.Name = "ICMPv6"
 		leaf.Info = fmt.Sprintf("Type:%d\nCode:%d\nChecksum:%d\nData:%s", icmpv6.TypeCode.Type(), icmpv6.TypeCode.Code(), icmpv6.Checksum, icmpv6.Payload)
 		leaf.Hex = fmt.Sprintf("%x", icmpv6.LayerContents())
 		return leaf
@@ -208,6 +214,7 @@ func getTCP(packet gopacket.Packet) Leaf {
 	if tcpLayer != nil {
 		tcp := tcpLayer.(*layers.TCP)
 		var leaf Leaf
+		leaf.Name = "TCP"
 		leaf.Info = fmt.Sprintf("From: %s\nTo: %s\nSeq: %d\nAck: %d\nDataOffset: %d\nFIN: %t\nSYN: %t\nRST: %t\nPSH: %t\nACK: %t\nURG: %t\nECE: %t\nCWR: %t\nNS: %t\nWindow: %d\nChecksum: %d\nUrgent: %d", tcp.SrcPort.String(), tcp.DstPort.String(), tcp.Seq, tcp.Ack, tcp.DataOffset, tcp.FIN, tcp.SYN, tcp.RST, tcp.PSH, tcp.ACK, tcp.URG, tcp.ECE, tcp.CWR, tcp.NS, tcp.Window, tcp.Checksum, tcp.Urgent)
 		leaf.Hex = fmt.Sprintf("%x", tcp.LayerContents())
 		return leaf
@@ -220,6 +227,7 @@ func getUDP(packet gopacket.Packet) Leaf {
 	if udpLayer != nil {
 		udp := udpLayer.(*layers.UDP)
 		var leaf Leaf
+		leaf.Name = "UDP"
 		leaf.Info = fmt.Sprintf("From: %s\nTo: %s\nLength: %d\nChecksum: %d", udp.SrcPort.String(), udp.DstPort.String(), udp.Length, udp.Checksum)
 		leaf.Hex = fmt.Sprintf("%x", udp.LayerContents())
 		return leaf

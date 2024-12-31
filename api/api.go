@@ -8,11 +8,15 @@ import (
 
 func InitRouter() {
 	r := gin.Default()
-	r.Use(gin.Logger())
-	r.Use(gin.Recovery(), corsMiddleware())
+	//r.Use(gin.Logger())
+	r.Use(corsMiddleware())
 
 	r.GET("/list", getNetCardsList)
 	r.GET("/listen", listen)
+	r.GET("/stop", stop)
+	r.GET("/require", require)
+	r.GET("/setFilter", setFilter)
+	r.GET("/setSorter", setSorter)
 
 	r.Run()
 }

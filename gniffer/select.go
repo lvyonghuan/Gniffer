@@ -9,7 +9,7 @@ import (
 	"github.com/google/gopacket/pcap"
 )
 
-var cards = make(map[string]NetCard)
+var cards = make(map[string]*NetCard)
 
 // GetNetCards Get all network cards
 func GetNetCards() []NetCard {
@@ -29,7 +29,7 @@ func GetNetCards() []NetCard {
 		}
 
 		netCards = append(netCards, NetCard)
-		cards[device.Name] = NetCard
+		cards[device.Name] = &NetCard
 	}
 
 	return netCards
@@ -38,17 +38,18 @@ func GetNetCards() []NetCard {
 func GetCards() []NetCard {
 	var netCards []NetCard
 	for _, card := range cards {
-		netCards = append(netCards, card)
+		netCards = append(netCards, *card)
 	}
 	return netCards
 }
 
 func (n *NetCard) Init() {
 	debugPrint("Init card" + n.device.Description)
-	n.stopCtx = context.Background()
+	n.stopCtx, n.stopCancelFunc = context.WithCancel(context.Background())
 	n.originDataChan = make(chan gopacket.Packet, 100)
 	n.reset = make(chan struct{})
 	n.bufferMu = sync.Mutex{}
+	n.nextID = 0
 }
 
 func Start(cardName string) error {
@@ -66,5 +67,8 @@ func Start(cardName string) error {
 
 func Stop(cardName string) {
 	card := cards[cardName]
-	card.stopCtx.Done()
+	card.stopCancelFunc()
+
+	*beforeHandelBuffer = (*beforeHandelBuffer)[:0]
+	frontBuffer = frontBuffer[:0]
 }
