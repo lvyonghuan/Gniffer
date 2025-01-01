@@ -7,5 +7,6 @@ import (
 
 func main() {
 	gniffer.GetNetCards()
+	go gniffer.HandelData()
 	api.InitRouter()
 }

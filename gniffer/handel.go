@@ -36,15 +36,12 @@ const (
 	Length      = "length"
 )
 
-func (n *NetCard) handelData() {
+func HandelData() {
 	ticker := time.NewTicker(750 * time.Millisecond)
 	defer ticker.Stop()
 
 	for {
 		select {
-		case <-n.stopCtx.Done():
-			debugPrint("Stop handel data on" + n.device.Description)
-			return
 		case <-ticker.C:
 			filterBuffer := filterData(FilterType)
 			//sortBuffer := sortData(SortType, filterBuffer)
@@ -56,6 +53,10 @@ func (n *NetCard) handelData() {
 }
 
 func filterData(protocolType string) []TreeRoot {
+	if beforeHandelBuffer == nil {
+		return nil
+	}
+
 	if protocolType == NoFilter {
 		return *beforeHandelBuffer
 	} else {

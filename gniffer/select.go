@@ -50,6 +50,11 @@ func (n *NetCard) Init() {
 	n.reset = make(chan struct{})
 	n.bufferMu = sync.Mutex{}
 	n.nextID = 0
+	n.buffer = n.buffer[:0]
+
+	beforeHandelBuffer = &(n.buffer)
+	*beforeHandelBuffer = (*beforeHandelBuffer)[:0]
+	frontBuffer = frontBuffer[:0]
 }
 
 func Start(cardName string) error {
@@ -68,7 +73,4 @@ func Start(cardName string) error {
 func Stop(cardName string) {
 	card := cards[cardName]
 	card.stopCancelFunc()
-
-	*beforeHandelBuffer = (*beforeHandelBuffer)[:0]
-	frontBuffer = frontBuffer[:0]
 }
