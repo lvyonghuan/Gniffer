@@ -26,6 +26,8 @@ const (
 	LLC      = "LLC"
 	ICMPv4   = "ICMPv4"
 	ICMPv6   = "ICMPv6"
+	VXLan    = "VXLan"
+	OpenFlow = "OpenFlow"
 	NoFilter = "NoFilter"
 
 	ID          = "id"

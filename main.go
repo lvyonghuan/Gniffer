@@ -6,6 +6,8 @@ import (
 )
 
 func main() {
+	//analyze.RegisterOpenFlow()
+
 	gniffer.GetNetCards()
 	api.InitRouter()
 }

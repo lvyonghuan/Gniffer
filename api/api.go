@@ -2,7 +2,10 @@ package api
 
 import (
 	"gniffer/gniffer"
+	"os"
+	"strings"
 
+	"github.com/gin-contrib/static"
 	"github.com/gin-gonic/gin"
 )
 
@@ -17,6 +20,24 @@ func InitRouter() {
 	r.GET("/require", require)
 	r.GET("/setFilter", setFilter)
 	r.GET("/setSorter", setSorter)
+
+	r.Use(static.Serve("/", static.LocalFile("./dist", true)))
+	r.NoRoute(func(c *gin.Context) {
+		accept := c.Request.Header.Get("Accept")
+		flag := strings.Contains(accept, "text/html")
+		if flag {
+			content, err := os.ReadFile("./dist/index.html")
+			if err != nil {
+				c.Writer.WriteHeader(404)
+				c.Writer.WriteString("Not Found")
+				return
+			}
+			c.Writer.WriteHeader(200)
+			c.Writer.Header().Add("Accept", "text/html")
+			c.Writer.Write(content)
+			c.Writer.Flush()
+		}
+	})
 
 	r.Run()
 }
